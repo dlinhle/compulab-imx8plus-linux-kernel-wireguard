@@ -2,11 +2,15 @@
 
 ## Overview
 
-This repository contains a pre-built custom Linux kernel for the **Amplified NodeG5 (COMPULAB IMX8PLUS)** device with built-in WireGuard support. 
+This repository contains a pre-built custom Linux kernel for the **Amplified NodeG5 (COMPULAB IMX8PLUS)** device with built-in WireGuard support, along with automated installation scripts.
 
 ## What's Included
 
 - **`compulab-kernel-5.15.32-wireguard.tar.xz`** - Complete compiled kernel source with WireGuard built-in
+- **`install_wireguard.sh`** - Automated installation script with user prompts and error handling
+- **`verify_wireguard.sh`** - Post-installation verification script
+- **`INSTALLATION_GUIDE.md`** - Comprehensive installation guide and troubleshooting
+- **`3 Install Wireguard VPN 250ecf22b5f28040b071e8fe5b675a44.md`** - Original detailed documentation
 
 ## Kernel Details
 
@@ -15,6 +19,44 @@ This repository contains a pre-built custom Linux kernel for the **Amplified Nod
 - **Architecture**: ARM64 (aarch64)
 - **Key Features**:
   - WireGuard VPN built-in (not as module)
+
+## Quick Start (Automated Installation)
+
+**Recommended**: Use the automated installation script for a guided setup:
+
+```bash
+# Download the installation script
+curl -L -O https://github.com/dlinhle/compulab-imx8plus-linux-kernel-wireguard/raw/main/install_wireguard.sh
+
+# Make the script executable
+chmod +x install_wireguard.sh
+
+# Run the automated installation
+./install_wireguard.sh
+```
+
+The script will:
+- Download and verify kernel files automatically
+- Install the custom kernel with proper configuration
+- Set up GRUB to boot the Wireguard kernel by default
+- Install Wireguard tools and dependencies
+- Provide verification steps and next instructions
+
+After installation, verify everything is working:
+```bash
+# Download the verification script
+curl -L -O https://github.com/dlinhle/compulab-imx8plus-linux-kernel-wireguard/raw/main/verify_wireguard.sh
+
+# Make verification script executable
+chmod +x verify_wireguard.sh
+
+# Run after reboot to verify installation
+./verify_wireguard.sh
+```
+
+## Manual Installation
+
+If you prefer manual installation, follow these steps:
 
 1. **Download all tarball parts** from this repository:
    ```bash
@@ -42,3 +84,5 @@ This repository contains a pre-built custom Linux kernel for the **Amplified Nod
    # Remove the parts to free up space
    rm -f compulab-kernel-5.15.32-wireguard.tar.xz.part*
    ```
+
+For complete manual installation steps, see the detailed documentation in `INSTALLATION_GUIDE.md`.
