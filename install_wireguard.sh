@@ -56,14 +56,6 @@ prompt_continue() {
     fi
 }
 
-# Function to check if running as root
-check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        print_error "This script should not be run as root. Please run as a regular user with sudo privileges."
-        exit 1
-    fi
-}
-
 # Function to check if user has sudo privileges
 check_sudo() {
     if ! sudo -n true 2>/dev/null; then
@@ -454,7 +446,6 @@ main() {
     prompt_continue "Ready to begin the installation?"
     
     # Pre-flight checks
-    check_root
     check_sudo
     
     # Execute installation steps
