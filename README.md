@@ -1,8 +1,31 @@
-# NodeG5 Custom Linux Kernel with WireGuard Support
+# Compulab IOT-GATE-IMX8PLUS Linux Kernel with Wireguard Support
 
-## Overview
+This repository contains the installation scripts and files needed to install a custom Linux kernel with Wireguard support on the Compulab IOT-GATE-IMX8PLUS (Node G5) device.
 
-This repository contains a pre-built custom Linux kernel for the **Amplified NodeG5 (COMPULAB IMX8PLUS)** device with built-in WireGuard support, along with automated installation scripts.
+## Features
+
+- **Custom Linux Kernel 5.15.32** with built-in Wireguard support
+- **Automated Installation** via shell scripts
+- **Checksum Verification** for file integrity
+- **GRUB Configuration** for seamless booting
+- **Enhanced File Validation** with user prompts for re-downloads
+
+## New Enhanced Features
+
+### Smart File Validation and Re-download Prompts
+
+The installation script now includes enhanced logic to handle existing files:
+
+1. **Checksum Validation**: Before skipping downloads, the script validates existing files against their checksums
+2. **User Prompts**: When valid files already exist, users are prompted to choose:
+   - Skip download and use existing files
+   - Re-download files anyway
+3. **Automatic Cleanup**: Invalid or corrupted files are automatically removed before re-download
+4. **Two-Stage Validation**: 
+   - Validates individual downloaded parts
+   - Validates the combined tarball separately
+
+This prevents issues with corrupted downloads and gives users control over the download process.
 
 ## What's Included
 
