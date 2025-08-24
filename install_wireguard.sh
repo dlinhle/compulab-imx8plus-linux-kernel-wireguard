@@ -151,6 +151,7 @@ prompt_redownload() {
         message="Downloaded kernel parts already exist and checksums are valid."
     else
         message="Combined kernel tarball already exists and checksum is valid."
+        print_info "The kernel is ready for installation without re-downloading."
     fi
     
     echo ""
@@ -188,11 +189,23 @@ download_kernel() {
     
     prompt_continue "Ready to download kernel files?"
     
-    # Check if files already exist and validate checksums
-    if validate_existing_parts; then
-        # Files exist and checksums are valid, prompt user
+    # First priority: Check if combined file exists and checksum matches
+    if validate_existing_combined; then
+        # Combined file exists and checksum is valid, prompt user
+        if prompt_redownload "combined"; then
+            print_info "Using existing combined file. Skipping download."
+            return 0
+        else
+            print_info "Removing existing files for re-download..."
+            rm -f compulab-kernel-5.15.32-wireguard.tar.xz
+            rm -f compulab-kernel-5.15.32-wireguard.tar.xz.part*
+            rm -f SHA256SUMS SHA256SUMS-PARTS
+        fi
+    # Second priority: If combined file doesn't exist, check individual parts
+    elif validate_existing_parts; then
+        # Parts exist and checksums are valid, prompt user
         if prompt_redownload "parts"; then
-            print_info "Skipping download as requested."
+            print_info "Using existing part files. Skipping download."
             return 0
         else
             print_info "Removing existing files for re-download..."
@@ -200,12 +213,14 @@ download_kernel() {
             rm -f SHA256SUMS SHA256SUMS-PARTS
         fi
     else
-        # Files don't exist or checksums are invalid
-        if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz.partaa" ] || 
+        # Neither combined file nor valid parts exist, clean up any invalid files
+        if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ] || 
+           [ -f "compulab-kernel-5.15.32-wireguard.tar.xz.partaa" ] || 
            [ -f "compulab-kernel-5.15.32-wireguard.tar.xz.partab" ] ||
            [ -f "SHA256SUMS" ] || [ -f "SHA256SUMS-PARTS" ]; then
             print_warning "Some files exist but checksums are invalid or incomplete."
             print_info "Cleaning up invalid files..."
+            rm -f compulab-kernel-5.15.32-wireguard.tar.xz
             rm -f compulab-kernel-5.15.32-wireguard.tar.xz.part*
             rm -f SHA256SUMS SHA256SUMS-PARTS
         fi
@@ -228,38 +243,21 @@ download_kernel() {
 reassemble_kernel() {
     print_header "Step 2: Reassembling and Extracting Kernel"
     
-    # Verify checksums of parts first
-    verify_checksums
-    
-    # Check if combined tarball already exists and is valid
-    if validate_existing_combined; then
-        # Combined file exists and checksum is valid, prompt user
-        if prompt_redownload "combined"; then
-            print_info "Using existing combined tarball."
-        else
-            print_info "Removing existing combined file for reassembly..."
-            rm -f compulab-kernel-5.15.32-wireguard.tar.xz
-            print_info "Reassembling kernel tarball..."
-            cat compulab-kernel-5.15.32-wireguard.tar.xz.part* > compulab-kernel-5.15.32-wireguard.tar.xz
-            
-            # Verify the newly created file
-            verify_checksums
-            
-            print_info "Cleaning up part files..."
-            rm -f compulab-kernel-5.15.32-wireguard.tar.xz.part*
-        fi
+    # Check if combined tarball already exists (from download step)
+    if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
+        print_info "Combined tarball already exists."
+        # Verify the existing file
+        verify_checksums
     else
-        # Combined file doesn't exist or checksum is invalid
-        if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
-            print_warning "Combined tarball exists but checksum is invalid."
-            print_info "Removing invalid combined file..."
-            rm -f compulab-kernel-5.15.32-wireguard.tar.xz
-        fi
+        print_info "Reassembling kernel tarball from parts..."
         
-        print_info "Reassembling kernel tarball..."
+        # Verify checksums of parts first
+        verify_checksums
+        
+        # Reassemble the tarball
         cat compulab-kernel-5.15.32-wireguard.tar.xz.part* > compulab-kernel-5.15.32-wireguard.tar.xz
         
-        # Verify the newly created file
+        # Verify the newly created combined file
         verify_checksums
         
         print_info "Cleaning up part files..."

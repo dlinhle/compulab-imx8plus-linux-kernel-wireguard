@@ -14,18 +14,24 @@ This repository contains the installation scripts and files needed to install a 
 
 ### Smart File Validation and Re-download Prompts
 
-The installation script now includes enhanced logic to handle existing files:
+The installation script now includes enhanced logic to handle existing files with intelligent priority:
 
-1. **Checksum Validation**: Before skipping downloads, the script validates existing files against their checksums
+1. **Priority-Based Validation**:
+   - **First Priority**: If combined tarball exists and checksum matches → prompt user
+   - **Second Priority**: If combined file doesn't exist, check individual parts and checksums → prompt user
+
 2. **User Prompts**: When valid files already exist, users are prompted to choose:
    - Skip download and use existing files
    - Re-download files anyway
-3. **Automatic Cleanup**: Invalid or corrupted files are automatically removed before re-download
-4. **Two-Stage Validation**: 
-   - Validates individual downloaded parts
-   - Validates the combined tarball separately
 
-This prevents issues with corrupted downloads and gives users control over the download process.
+3. **Automatic Cleanup**: Invalid or corrupted files are automatically removed before re-download
+
+4. **Intelligent Flow**: 
+   - Avoids unnecessary downloads when complete files are available
+   - Falls back to parts validation only when needed
+   - Simplifies reassembly process when combined file already exists
+
+This prevents issues with corrupted downloads, avoids unnecessary re-downloads, and gives users full control over the download process.
 
 ## What's Included
 
