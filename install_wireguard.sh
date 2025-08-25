@@ -662,7 +662,9 @@ create_grub_entry() {
     # Create custom GRUB entry
     print_info "Creating custom GRUB entry..."
     
-    cat << EOF | sudo tee -a /etc/grub.d/40_custom > /dev/null
+    # Only add the entry if it doesn't already exist
+    if ! grep -q "menuentry 'Debian GNU/Linux, with Linux 5.15.32 \[Wireguard\]'" /etc/grub.d/40_custom; then
+        cat << EOF | sudo tee -a /etc/grub.d/40_custom > /dev/null
 
 # Custom Wireguard Kernel Entry
 menuentry 'Debian GNU/Linux, with Linux 5.15.32 [Wireguard]' --class debian --class gnu-linux --class gnu --class os {
@@ -678,6 +680,10 @@ menuentry 'Debian GNU/Linux, with Linux 5.15.32 [Wireguard]' --class debian --cl
         initrd  /boot/initrd.img-$KERNEL_VERSION
 }
 EOF
+        print_success "Custom GRUB entry added."
+    else
+        print_info "Custom GRUB entry already exists. Skipping addition."
+    fi
     
     print_info "Updating GRUB configuration..."
     sudo update-grub
@@ -838,7 +844,7 @@ main() {
         echo -e "${BLUE}After reboot, resume installation from step 7 by running:${NC}"
         echo "  sudo $0 --start-from=7"
         echo ""
-        read -p "Reboot now and continue later from step 7? (y/N): " -n 1 -r
+        read -p "Reboot now and continue later from step 7? (Y/n): " -n 1 -r
         echo ""
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             print_info "Rebooting system..."
