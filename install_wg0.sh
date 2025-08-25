@@ -299,7 +299,8 @@ main() {
     
     echo
     print_success "WireGuard configuration completed successfully!"
-    print_status "Your Edge Device is now connected to the Wireguard VPN."
+    print_status "Your Device is now connected to the Wireguard VPN."
+}
 
 # Cleanup function
 cleanup() {
