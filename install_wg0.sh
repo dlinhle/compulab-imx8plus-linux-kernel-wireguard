@@ -302,14 +302,5 @@ main() {
     print_status "Your Device is now connected to the Wireguard VPN."
 }
 
-# Cleanup function
-cleanup() {
-    # Clean up any temporary files if created
-    :
-}
-
-# Set trap for cleanup
-trap cleanup EXIT
-
 # Run main function
 main "$@"
