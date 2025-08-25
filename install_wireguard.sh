@@ -91,31 +91,101 @@ install_kernel_headers() {
         fi
     done
     
+    # If we found a local tarball, verify its checksum if possible
+    if [[ -n "$found_tarball" ]]; then
+        print_info "Found local headers tarball: $found_tarball"
+        
+        # Check if we have a checksum file to verify against
+        local checksum_file=""
+        local checksum_dir=$(dirname "$found_tarball")
+        
+        # Look for SHA256SUMS-HEADERS in the same directory as the tarball
+        if [[ -f "${checksum_dir}/SHA256SUMS-HEADERS" ]]; then
+            checksum_file="${checksum_dir}/SHA256SUMS-HEADERS"
+        elif [[ -f "./SHA256SUMS-HEADERS" ]]; then
+            checksum_file="./SHA256SUMS-HEADERS"
+        elif [[ -f "../SHA256SUMS-HEADERS" ]]; then
+            checksum_file="../SHA256SUMS-HEADERS"
+        fi
+        
+        if [[ -n "$checksum_file" ]]; then
+            print_info "Verifying local headers tarball checksum..."
+            
+            # Read expected checksum from SHA256SUMS-HEADERS file
+            local expected_checksum=""
+            expected_checksum=$(grep "compulab-imx8plus-headers-5.15.32.tar.gz" "$checksum_file" | cut -d' ' -f1)
+            
+            if [[ -n "$expected_checksum" ]]; then
+                local actual_checksum=$(sha256sum "$found_tarball" | cut -d' ' -f1)
+                
+                # Convert both checksums to lowercase for case-insensitive comparison
+                local expected_lower=$(echo "$expected_checksum" | tr '[:upper:]' '[:lower:]')
+                local actual_lower=$(echo "$actual_checksum" | tr '[:upper:]' '[:lower:]')
+                
+                if [[ "$actual_lower" == "$expected_lower" ]]; then
+                    print_success "Local headers checksum verification passed"
+                else
+                    print_error "Local headers checksum verification failed!"
+                    print_error "Expected: $expected_checksum"
+                    print_error "Actual:   $actual_checksum"
+                    print_warning "Local file appears to be corrupted, will attempt download instead"
+                    found_tarball=""
+                fi
+            else
+                print_warning "Could not read checksum from $checksum_file, skipping verification"
+            fi
+        else
+            print_warning "No checksum file found for local headers tarball, skipping verification"
+        fi
+    fi
+    
     if [[ -z "$found_tarball" ]]; then
-        print_warning "No kernel headers tarball found in local locations."
+        print_warning "No kernel headers tarball found in local locations or local file failed verification."
         print_info "Attempting to download from GitHub repository..."
         
-        # Try to download the headers tarball
+        # Try to download the headers tarball and checksum file
         local headers_url="https://github.com/dlinhle/compulab-imx8plus-linux-kernel-wireguard/raw/main/compulab-imx8plus-headers-5.15.32.tar.gz"
+        local checksum_url="https://github.com/dlinhle/compulab-imx8plus-linux-kernel-wireguard/raw/main/SHA256SUMS-HEADERS"
         local local_headers="./compulab-imx8plus-headers-5.15.32.tar.gz"
+        local local_checksums="./SHA256SUMS-HEADERS"
         
         print_info "Downloading headers from: $headers_url"
-        if curl -L -o "$local_headers" "$headers_url"; then
-            print_success "Headers tarball downloaded successfully: $local_headers"
+        print_info "Downloading checksum file from: $checksum_url"
+        
+        if curl -L -o "$local_headers" "$headers_url" && curl -L -o "$local_checksums" "$checksum_url"; then
+            print_success "Headers tarball and checksum file downloaded successfully"
+            print_success "Headers: $local_headers"
+            print_success "Checksums: $local_checksums"
             
             # Verify SHA256 checksum for compulab-imx8plus-headers-5.15.32.tar.gz
             print_info "Verifying SHA256 checksum..."
-            local expected_checksum="308FD71074CF2EE478C4CA689E2A056443C7932D70DD45BBD6EAAB46FC4D8638"
+            
+            # Read expected checksum from SHA256SUMS-HEADERS file
+            local expected_checksum=""
+            if [ -f "SHA256SUMS-HEADERS" ]; then
+                expected_checksum=$(grep "compulab-imx8plus-headers-5.15.32.tar.gz" SHA256SUMS-HEADERS | cut -d' ' -f1)
+            fi
+            
+            if [ -z "$expected_checksum" ]; then
+                print_error "Could not read checksum from SHA256SUMS-HEADERS file"
+                rm -f "$local_headers" "$local_checksums"
+                return 1
+            fi
+            
             local actual_checksum=$(sha256sum "$local_headers" | cut -d' ' -f1)
             
-            if [[ "$actual_checksum" == "$expected_checksum" ]]; then
+            # Convert both checksums to lowercase for case-insensitive comparison
+            local expected_lower=$(echo "$expected_checksum" | tr '[:upper:]' '[:lower:]')
+            local actual_lower=$(echo "$actual_checksum" | tr '[:upper:]' '[:lower:]')
+            
+            if [[ "$actual_lower" == "$expected_lower" ]]; then
                 print_success "Headers checksum verification passed"
                 found_tarball="$local_headers"
             else
                 print_error "Headers checksum verification failed!"
                 print_error "Expected: $expected_checksum"
                 print_error "Actual:   $actual_checksum"
-                rm -f "$local_headers"
+                rm -f "$local_headers" "$local_checksums"
                 print_info "Please ensure you have transferred the headers package to one of these locations:"
                 echo "  - ./compulab-imx8plus-headers-*.tar.gz (current directory)"
                 echo "  - ../compulab-imx8plus-headers-*.tar.gz (parent directory)"
@@ -126,7 +196,9 @@ install_kernel_headers() {
                 return 1
             fi
         else
-            print_error "Failed to download headers tarball from GitHub!"
+            print_error "Failed to download headers tarball or checksum file from GitHub!"
+            # Clean up any partially downloaded files
+            rm -f "$local_headers" "$local_checksums"
             print_info "Please ensure you have transferred the headers package to one of these locations:"
             echo "  - ./compulab-imx8plus-headers-*.tar.gz (current directory)"
             echo "  - ../compulab-imx8plus-headers-*.tar.gz (parent directory)"
