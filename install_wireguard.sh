@@ -543,7 +543,7 @@ install_kernel() {
     prompt_continue "Ready to install the kernel?"
     
     print_info "Changing to kernel directory..."
-    cd /linux-compulab
+    cd /linux-compulab/compulab-kernel/linux-compulab
     
     print_info "Installing kernel modules... (this may take a while)"
     sudo make modules_install
