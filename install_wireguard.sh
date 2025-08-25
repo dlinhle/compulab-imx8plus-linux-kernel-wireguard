@@ -206,25 +206,30 @@ install_kernel_headers() {
 }
 
 # Function to verify file checksums
+# Optimized to skip individual part verification when combined file already exists and is verified
 verify_checksums() {
     print_info "Verifying file checksums..."
     
+    # If combined file exists and we have its checksum, verify only that
+    # This avoids unnecessary verification of individual parts
+    if [ -f "SHA256SUMS" ] && [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
+        print_info "Verifying complete tarball..."
+        if sha256sum -c SHA256SUMS; then
+            print_success "Complete tarball verification passed."
+            return 0
+        else
+            print_error "Complete tarball verification failed!"
+            exit 1
+        fi
+    fi
+    
+    # Only verify individual parts if combined file doesn't exist
     if [ -f "SHA256SUMS-PARTS" ]; then
         print_info "Verifying individual parts..."
         if sha256sum -c SHA256SUMS-PARTS; then
             print_success "Individual parts verification passed."
         else
             print_error "Individual parts verification failed!"
-            exit 1
-        fi
-    fi
-    
-    if [ -f "SHA256SUMS" ] && [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
-        print_info "Verifying complete tarball..."
-        if sha256sum -c SHA256SUMS; then
-            print_success "Complete tarball verification passed."
-        else
-            print_error "Complete tarball verification failed!"
             exit 1
         fi
     fi
@@ -376,19 +381,33 @@ reassemble_kernel() {
     # Check if combined tarball already exists (from download step)
     if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
         print_info "Combined tarball already exists."
-        # Verify the existing file
+        # Verify the existing file (this will skip individual part verification)
         verify_checksums
     else
         print_info "Reassembling kernel tarball from parts..."
         
-        # Verify checksums of parts first
-        verify_checksums
+        # Verify checksums of parts first (only when we need to reassemble)
+        if [ -f "SHA256SUMS-PARTS" ]; then
+            print_info "Verifying individual parts before reassembly..."
+            if sha256sum -c SHA256SUMS-PARTS; then
+                print_success "Individual parts verification passed."
+            else
+                print_error "Individual parts verification failed!"
+                exit 1
+            fi
+        fi
         
         # Reassemble the tarball
         cat compulab-kernel-5.15.32-wireguard.tar.xz.part* > compulab-kernel-5.15.32-wireguard.tar.xz
         
         # Verify the newly created combined file
-        verify_checksums
+        print_info "Verifying newly created combined tarball..."
+        if sha256sum -c SHA256SUMS; then
+            print_success "Combined tarball verification passed."
+        else
+            print_error "Combined tarball verification failed!"
+            exit 1
+        fi
         
         print_info "Cleaning up part files..."
         rm -f compulab-kernel-5.15.32-wireguard.tar.xz.part*
