@@ -223,8 +223,31 @@ install_kernel_headers() {
             
             # Quick test to see if the build environment works
             if make -C "/lib/modules/${current_kernel}/build" M=/tmp modules_prepare >/dev/null 2>&1; then
-                print_success "Build environment is working, skipping header installation"
-                return 0
+                print_success "Build environment is working"
+                echo ""
+                print_info "Kernel headers are already installed and working correctly."
+                echo -e "${YELLOW}Options:${NC}"
+                echo "  1. Skip header installation (use existing headers)"
+                echo "  2. Reinstall headers anyway"
+                echo ""
+                
+                while true; do
+                    read -p "Please choose (1 to skip, 2 to reinstall): " -n 1 -r choice
+                    echo ""
+                    case $choice in
+                        1)
+                            print_info "Using existing kernel headers. Skipping installation."
+                            return 0
+                            ;;
+                        2)
+                            print_info "Will reinstall kernel headers."
+                            break
+                            ;;
+                        *)
+                            print_warning "Please enter 1 or 2."
+                            ;;
+                    esac
+                done
             else
                 print_warning "Existing headers may be incomplete, reinstalling..."
             fi
