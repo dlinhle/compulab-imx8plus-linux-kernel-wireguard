@@ -44,6 +44,9 @@ print_header() {
     echo ""
 }
 
+# Default starting step (can be overridden by --start-from)
+START_FROM_STEP=1
+
 # Function to prompt user for continuation
 prompt_continue() {
     local message="$1"
@@ -67,6 +70,38 @@ prompt_skip_step() {
         return 0
     fi
     return 1
+}
+
+# Parse CLI arguments (supports --start-from N)
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --start-from=*)
+                START_FROM_STEP="${1#*=}"
+                shift
+                ;;
+            --start-from)
+                START_FROM_STEP="$2"
+                shift 2
+                ;;
+            -h|--help)
+                echo "Usage: $0 [--start-from N]"
+                echo "  --start-from N   Begin execution at step N (1-8)"
+                exit 0
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    if ! [[ "$START_FROM_STEP" =~ ^[0-9]+$ ]]; then
+        print_error "Invalid --start-from value: $START_FROM_STEP"
+        exit 1
+    fi
+    if (( START_FROM_STEP < 1 || START_FROM_STEP > 8 )); then
+        print_error "--start-from must be between 1 and 8"
+        exit 1
+    fi
 }
 
 # Function to check if user has sudo privileges
@@ -753,6 +788,9 @@ show_completion() {
 main() {
     print_header "Wireguard Installation Script for Node G5"
     
+    # Parse command-line arguments (e.g., --start-from=7)
+    parse_args "$@"
+
     echo "This script will:"
     echo "  1. Download the custom Linux kernel with Wireguard support"
     echo "  2. Reassemble and extract the kernel"
@@ -778,14 +816,44 @@ main() {
     check_sudo
     
     # Execute installation steps
-    download_kernel
-    reassemble_kernel
-    prepare_kernel_build
-    install_kernel
-    create_grub_entry
-    set_default_boot
-    install_wireguard_tools
-    test_wireguard
+    if (( START_FROM_STEP <= 1 )); then
+        download_kernel
+    fi
+    if (( START_FROM_STEP <= 2 )); then
+        reassemble_kernel
+    fi
+    if (( START_FROM_STEP <= 3 )); then
+        prepare_kernel_build
+    fi
+    if (( START_FROM_STEP <= 4 )); then
+        install_kernel
+    fi
+    if (( START_FROM_STEP <= 5 )); then
+        create_grub_entry
+    fi
+    if (( START_FROM_STEP <= 6 )); then
+        set_default_boot
+        echo ""
+        echo -e "${YELLOW}A reboot is recommended now to boot into the new kernel to install Wireguard.${NC}"
+        echo -e "${BLUE}After reboot, resume installation from step 7 by running:${NC}"
+        echo "  sudo $0 --start-from=7"
+        echo ""
+        read -p "Reboot now and continue later from step 7? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Rebooting system..."
+            sudo reboot
+            exit 0
+        else
+            print_info "Continuing without reboot."
+        fi
+    fi
+    if (( START_FROM_STEP <= 7 )); then
+        install_wireguard_tools
+    fi
+    if (( START_FROM_STEP <= 8 )); then
+        test_wireguard
+    fi
     show_completion
 }
 
