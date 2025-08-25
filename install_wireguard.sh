@@ -235,9 +235,12 @@ install_kernel_headers() {
     local temp_dir=$(mktemp -d)
     local original_dir=$(pwd)
     
+    # Store the absolute path to the tarball before changing directories
+    local absolute_tarball_path=$(realpath "$found_tarball")
+    
     print_info "Extracting headers tarball..."
     cd "$temp_dir"
-    tar -xzf "$found_tarball"
+    tar -xzf "$absolute_tarball_path"
     
     # Find the installation script
     local install_script=$(find . -name "install-headers.sh" | head -1)
