@@ -575,6 +575,10 @@ install_kernel() {
         return 0
     fi
     
+    print_info "Installing initramfs-tools package..."
+    sudo apt update
+    sudo apt install -y initramfs-tools
+
     print_info "Changing to kernel directory..."
     cd /linux-compulab/compulab-kernel/linux-compulab
     
@@ -684,7 +688,7 @@ install_wireguard_tools() {
     sudo apt install -y resolvconf
     
     print_info "Installing Wireguard tools..."
-    sudo apt install -y wireguard wireguard-tools
+    sudo apt install -y --no-install-recommends wireguard wireguard-tools
     
     print_success "Wireguard tools installed successfully."
 }
