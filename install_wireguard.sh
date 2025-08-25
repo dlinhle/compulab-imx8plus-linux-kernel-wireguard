@@ -7,6 +7,7 @@
 # Wireguard support and configures the system to boot into it by default.
 #
 # Based on: 3 Install Wireguard VPN documentation
+# Modified to include automatic kernel headers installation
 # =============================================================================
 
 set -e  # Exit on any error
@@ -64,6 +65,143 @@ check_sudo() {
             print_error "Failed to obtain sudo privileges. Exiting."
             exit 1
         fi
+    fi
+}
+
+# Function to find and install kernel headers
+install_kernel_headers() {
+    print_header "KERNEL HEADERS INSTALLATION"
+    
+    # Look for headers tarball in common locations
+    local header_files=(
+        "./compulab-imx8plus-headers-*.tar.gz"
+        "../compulab-imx8plus-headers-*.tar.gz"
+        "~/compulab-imx8plus-headers-*.tar.gz"
+        "/tmp/compulab-imx8plus-headers-*.tar.gz"
+    )
+    
+    local found_tarball=""
+    for pattern in "${header_files[@]}"; do
+        # Expand the pattern using eval to handle tilde
+        local expanded_pattern=$(eval echo $pattern)
+        local files=($(ls $expanded_pattern 2>/dev/null || true))
+        if [[ ${#files[@]} -gt 0 ]]; then
+            found_tarball="${files[0]}"  # Take the first match
+            break
+        fi
+    done
+    
+    if [[ -z "$found_tarball" ]]; then
+        print_warning "No kernel headers tarball found in local locations."
+        print_info "Attempting to download from GitHub repository..."
+        
+        # Try to download the headers tarball
+        local headers_url="https://github.com/dlinhle/compulab-imx8plus-linux-kernel-wireguard/raw/main/compulab-imx8plus-headers-5.15.32.tar.gz"
+        local local_headers="./compulab-imx8plus-headers-5.15.32.tar.gz"
+        
+        print_info "Downloading headers from: $headers_url"
+        if curl -L -o "$local_headers" "$headers_url"; then
+            print_success "Headers tarball downloaded successfully: $local_headers"
+            
+            # Verify SHA256 checksum for compulab-imx8plus-headers-5.15.32.tar.gz
+            print_info "Verifying SHA256 checksum..."
+            local expected_checksum="308FD71074CF2EE478C4CA689E2A056443C7932D70DD45BBD6EAAB46FC4D8638"
+            local actual_checksum=$(sha256sum "$local_headers" | cut -d' ' -f1)
+            
+            if [[ "$actual_checksum" == "$expected_checksum" ]]; then
+                print_success "Headers checksum verification passed"
+                found_tarball="$local_headers"
+            else
+                print_error "Headers checksum verification failed!"
+                print_error "Expected: $expected_checksum"
+                print_error "Actual:   $actual_checksum"
+                rm -f "$local_headers"
+                print_info "Please ensure you have transferred the headers package to one of these locations:"
+                echo "  - ./compulab-imx8plus-headers-*.tar.gz (current directory)"
+                echo "  - ../compulab-imx8plus-headers-*.tar.gz (parent directory)"
+                echo "  - ~/compulab-imx8plus-headers-*.tar.gz (home directory)"
+                echo "  - /tmp/compulab-imx8plus-headers-*.tar.gz (tmp directory)"
+                echo
+                print_info "Or ensure you have internet access to download from GitHub."
+                return 1
+            fi
+        else
+            print_error "Failed to download headers tarball from GitHub!"
+            print_info "Please ensure you have transferred the headers package to one of these locations:"
+            echo "  - ./compulab-imx8plus-headers-*.tar.gz (current directory)"
+            echo "  - ../compulab-imx8plus-headers-*.tar.gz (parent directory)"
+            echo "  - ~/compulab-imx8plus-headers-*.tar.gz (home directory)"
+            echo "  - /tmp/compulab-imx8plus-headers-*.tar.gz (tmp directory)"
+            echo
+            print_info "Or ensure you have internet access to download from GitHub."
+            return 1
+        fi
+    fi
+    
+    print_success "Found headers tarball: $found_tarball"
+    
+    # Check if headers are already installed and working
+    local current_kernel=$(uname -r)
+    if [[ -L "/lib/modules/${current_kernel}/build" ]] && [[ -f "/lib/modules/${current_kernel}/build/Makefile" ]]; then
+        print_info "Checking existing kernel headers..."
+        
+        if [[ -f "/lib/modules/${current_kernel}/build/include/linux/version.h" ]]; then
+            print_success "Kernel headers already installed and appear complete"
+            print_info "Testing build environment..."
+            
+            # Quick test to see if the build environment works
+            if make -C "/lib/modules/${current_kernel}/build" M=/tmp modules_prepare >/dev/null 2>&1; then
+                print_success "Build environment is working, skipping header installation"
+                return 0
+            else
+                print_warning "Existing headers may be incomplete, reinstalling..."
+            fi
+        fi
+    fi
+    
+    # Create temporary directory for extraction
+    local temp_dir=$(mktemp -d)
+    local original_dir=$(pwd)
+    
+    print_info "Extracting headers tarball..."
+    cd "$temp_dir"
+    tar -xzf "$found_tarball"
+    
+    # Find the installation script
+    local install_script=$(find . -name "install-headers.sh" | head -1)
+    if [[ -z "$install_script" ]]; then
+        print_error "No install-headers.sh script found in tarball"
+        print_info "Tarball should contain the installation script from cross-compilation"
+        cd "$original_dir"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    print_info "Running kernel header installation script..."
+    chmod +x "$install_script"
+    
+    # Run the installation script
+    if sudo "$install_script"; then
+        print_success "Kernel headers installed successfully"
+    else
+        print_error "Header installation failed"
+        cd "$original_dir"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Cleanup
+    cd "$original_dir"
+    rm -rf "$temp_dir"
+    
+    # Verify installation
+    if [[ -L "/lib/modules/${current_kernel}/build" ]] && [[ -f "/lib/modules/${current_kernel}/build/Makefile" ]]; then
+        print_success "Kernel headers installation verified successfully"
+        print_info "Build symlink: /lib/modules/${current_kernel}/build"
+        return 0
+    else
+        print_error "Header installation verification failed"
+        return 1
     fi
 }
 
@@ -265,9 +403,22 @@ reassemble_kernel() {
     print_success "Kernel extracted successfully."
 }
 
+# Function to prepare kernel build environment
+prepare_kernel_build() {
+    print_header "Step 3: Preparing Kernel Build Environment"
+    
+    print_info "Preparing kernel build environment for WireGuard..."
+    if ! install_kernel_headers; then
+        print_error "Kernel headers installation failed - cannot proceed"
+        exit 1
+    fi
+    print_success "Kernel build environment ready"
+    echo
+}
+
 # Function to install kernel
 install_kernel() {
-    print_header "Step 3: Installing Custom Kernel"
+    print_header "Step 4: Installing Custom Kernel"
     
     print_warning "This step will install the custom kernel with Wireguard support."
     print_warning "This process may take several minutes."
@@ -291,7 +442,7 @@ install_kernel() {
 
 # Function to create custom GRUB entry
 create_grub_entry() {
-    print_header "Step 4: Creating Custom GRUB Entry"
+    print_header "Step 5: Creating Custom GRUB Entry"
     
     print_info "Looking for the newly installed kernel entry in GRUB configuration..."
     
@@ -343,7 +494,7 @@ EOF
 
 # Function to set default boot option
 set_default_boot() {
-    print_header "Step 5: Setting Default Boot Option"
+    print_header "Step 6: Setting Default Boot Option"
     
     print_info "Configuring GRUB to boot the Wireguard kernel by default..."
     
@@ -361,7 +512,7 @@ set_default_boot() {
 
 # Function to install Wireguard tools
 install_wireguard_tools() {
-    print_header "Step 6: Installing Wireguard Tools"
+    print_header "Step 7: Installing Wireguard Tools"
     
     print_info "Installing resolvconf (Wireguard dependency)..."
     sudo apt update
@@ -375,7 +526,7 @@ install_wireguard_tools() {
 
 # Function to test Wireguard installation
 test_wireguard() {
-    print_header "Step 7: Testing Wireguard Installation"
+    print_header "Step 8: Testing Wireguard Installation"
     
     print_info "Testing Wireguard module loading..."
     
@@ -432,15 +583,21 @@ main() {
     
     echo "This script will:"
     echo "  1. Download the custom Linux kernel with Wireguard support"
-    echo "  2. Install the kernel and configure GRUB"
-    echo "  3. Set the Wireguard kernel as the default boot option"
-    echo "  4. Install Wireguard tools and dependencies"
+    echo "  2. Reassemble and extract the kernel"
+    echo "  3. Prepare kernel build environment (install headers)"
+    echo "  4. Install the kernel and configure GRUB"
+    echo "  5. Set the Wireguard kernel as the default boot option"
+    echo "  6. Install Wireguard tools and dependencies"
+    echo ""
+    echo "Note: The kernel headers package will be automatically downloaded if not found"
+    echo "      in local locations (current directory, parent directory, home, or /tmp)"
     echo ""
     echo "Prerequisites:"
     echo "  - Debian 11 Linux on Node G5 (Compulab IOT-GATE-IMX8PLUS)"
     echo "  - Internet connection for downloads"
     echo "  - Sudo privileges"
     echo "  - At least 2GB free disk space"
+    echo "  - Kernel headers package (compulab-imx8plus-headers-*.tar.gz)"
     echo ""
     
     prompt_continue "Ready to begin the installation?"
@@ -451,6 +608,7 @@ main() {
     # Execute installation steps
     download_kernel
     reassemble_kernel
+    prepare_kernel_build
     install_kernel
     create_grub_entry
     set_default_boot
