@@ -57,6 +57,18 @@ prompt_continue() {
     fi
 }
 
+# Function to prompt user to optionally skip a step
+prompt_skip_step() {
+    echo ""
+    read -p "Skip this step? (y/N): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Skipping this step."
+        return 0
+    fi
+    return 1
+}
+
 # Function to check if user has sudo privileges
 check_sudo() {
     if ! sudo -n true 2>/dev/null; then
@@ -420,7 +432,10 @@ download_kernel() {
     print_info "This will download the custom Linux kernel with Wireguard support."
     print_info "The kernel is split into multiple parts due to size limitations."
     
-    prompt_continue "Ready to download kernel files?"
+    if prompt_skip_step; then
+        print_info "Step 1 skipped."
+        return 0
+    fi
     
     # First priority: Check if combined file exists and checksum matches
     if validate_existing_combined; then
@@ -476,6 +491,11 @@ download_kernel() {
 reassemble_kernel() {
     print_header "Step 2: Reassembling and Extracting Kernel"
     
+    if prompt_skip_step; then
+        print_info "Step 2 skipped."
+        return 0
+    fi
+    
     # Check if combined tarball already exists (from download step)
     if [ -f "compulab-kernel-5.15.32-wireguard.tar.xz" ]; then
         print_info "Combined tarball already exists."
@@ -517,20 +537,30 @@ reassemble_kernel() {
     print_info "Extracting kernel to /linux-compulab..."
     tar -xJf compulab-kernel-5.15.32-wireguard.tar.xz -C /linux-compulab
     
+    # Prompt user to delete the tarball after extraction
+    echo ""
+    read -p "Do you want to delete the kernel tarball (compulab-kernel-5.15.32-wireguard.tar.xz) to save disk space? [y/N]: " delete_tarball
+    if [[ "$delete_tarball" =~ ^[Yy]$ ]]; then
+        rm -f compulab-kernel-5.15.32-wireguard.tar.xz
+        print_info "Kernel tarball deleted."
+    else
+        print_info "Kernel tarball retained."
+    fi
+    
     print_success "Kernel extracted successfully."
 }
 
 # Function to prepare kernel build environment
 prepare_kernel_build() {
-    print_header "Step 3: Preparing Kernel Build Environment"
+    print_header "Step 3: Preparing Kernel Build Environment (skipped)"
     
-    print_info "Preparing kernel build environment for WireGuard..."
-    if ! install_kernel_headers; then
-        print_error "Kernel headers installation failed - cannot proceed"
-        exit 1
-    fi
-    print_success "Kernel build environment ready"
-    echo
+    # print_info "Preparing kernel build environment for WireGuard..."
+    # if ! install_kernel_headers; then
+    #     print_error "Kernel headers installation failed - cannot proceed"
+    #     exit 1
+    # fi
+    # print_success "Kernel build environment ready"
+    # echo
 }
 
 # Function to install kernel
@@ -540,7 +570,10 @@ install_kernel() {
     print_warning "This step will install the custom kernel with Wireguard support."
     print_warning "This process may take several minutes."
     
-    prompt_continue "Ready to install the kernel?"
+    if prompt_skip_step; then
+        print_info "Step 4 skipped."
+        return 0
+    fi
     
     print_info "Changing to kernel directory..."
     cd /linux-compulab/compulab-kernel/linux-compulab
@@ -560,6 +593,11 @@ install_kernel() {
 # Function to create custom GRUB entry
 create_grub_entry() {
     print_header "Step 5: Creating Custom GRUB Entry"
+    
+    if prompt_skip_step; then
+        print_info "Step 5 skipped."
+        return 0
+    fi
     
     print_info "Looking for the newly installed kernel entry in GRUB configuration..."
     
@@ -613,6 +651,11 @@ EOF
 set_default_boot() {
     print_header "Step 6: Setting Default Boot Option"
     
+    if prompt_skip_step; then
+        print_info "Step 6 skipped."
+        return 0
+    fi
+    
     print_info "Configuring GRUB to boot the Wireguard kernel by default..."
     
     # Backup original GRUB configuration
@@ -631,6 +674,11 @@ set_default_boot() {
 install_wireguard_tools() {
     print_header "Step 7: Installing Wireguard Tools"
     
+    if prompt_skip_step; then
+        print_info "Step 7 skipped."
+        return 0
+    fi
+    
     print_info "Installing resolvconf (Wireguard dependency)..."
     sudo apt update
     sudo apt install -y resolvconf
@@ -644,6 +692,11 @@ install_wireguard_tools() {
 # Function to test Wireguard installation
 test_wireguard() {
     print_header "Step 8: Testing Wireguard Installation"
+    
+    if prompt_skip_step; then
+        print_info "Step 8 skipped."
+        return 0
+    fi
     
     print_info "Testing Wireguard module loading..."
     

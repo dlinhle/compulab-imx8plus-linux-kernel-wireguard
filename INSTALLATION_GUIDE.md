@@ -176,7 +176,7 @@ If something goes wrong during installation:
 ### Support
 
 For issues specific to this installation script, please check:
-- The original documentation: `3 Install Wireguard VPN 250ecf22b5f28040b071e8fe5b675a44.md`
+- The original documentation: `3 Install Wireguard VPN`
 - Verify your system meets all prerequisites
 - Check system logs for detailed error messages
 
