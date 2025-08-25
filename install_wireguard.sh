@@ -576,7 +576,9 @@ install_kernel() {
     fi
     
     print_info "Installing initramfs-tools package..."
-    sudo apt update || true
+    if ! sudo apt update; then
+        echo "apt update failed, but continuing..."
+    fi
     sudo apt install initramfs-tools
 
     print_info "Changing to kernel directory..."
@@ -684,7 +686,9 @@ install_wireguard_tools() {
     fi
     
     print_info "Installing resolvconf (Wireguard dependency)..."
-    sudo apt update || true
+    if ! sudo apt update; then
+        echo "apt update failed, but continuing..."
+    fi
     sudo apt install -y resolvconf
     
     print_info "Installing Wireguard tools..."
